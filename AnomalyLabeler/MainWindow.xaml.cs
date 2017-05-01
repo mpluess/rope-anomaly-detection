@@ -65,9 +65,16 @@ namespace AnomalyLabeler
     public partial class MainWindow : Window
     {
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
-        private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
+        // private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
+        private const string PathToAnnotation = @"test.v2.anomaly_based.ann";
 
         private const ulong StartFrame = 0;
+
+        /// <summary>
+        /// If the user clicks to a position closer than or equal to this number to the left or right border of the image,
+        /// the position will be automatically adjusted to match the border exactly.
+        /// </summary>
+        private const int BorderSnapThreshold = 5;
 
         private RawImage raw;
 
@@ -95,11 +102,13 @@ namespace AnomalyLabeler
             raw = new RawImage(new FileInfo(PathToVideo));
             raw.ReadFrame(StartFrame);
 
-            CurrentFrameTextBlock.Text = GetCurrentFrame().ToString();
+            CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
 
             RopeImageControl.Source = raw.Source;
             RopeImageControl.Width = raw.ImageWidth;
             RopeImageControl.Height = raw.ImageHeight;
+            RopeImageOverlayCanvas.Width = raw.ImageWidth;
+            RopeImageOverlayCanvas.Height = raw.ImageHeight;
 
             hasLabelingStarted = false;
             annotatedFrames = new SortedSet<ulong>();
@@ -113,7 +122,7 @@ namespace AnomalyLabeler
             WriteAnnotationsFile();
 
             raw.ReadNextFrame();
-            CurrentFrameTextBlock.Text = GetCurrentFrame().ToString();
+            CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
         }
 
         private void RopeImageControl_MouseUp(object sender, MouseButtonEventArgs e)
@@ -122,6 +131,11 @@ namespace AnomalyLabeler
             if (hasLabelingStarted)
             {
                 int xEnd = (int)(p.X);
+                if (xEnd >= RopeImageOverlayCanvas.Width - 1 - BorderSnapThreshold)
+                {
+                    xEnd = (int)(RopeImageOverlayCanvas.Width - 1);
+                }
+                AddVerticalLineToCanvas(RopeImageOverlayCanvas, xEnd);
                 if (xEnd < xStart)
                 {
                     int xStartOrig = xStart;
@@ -140,17 +154,36 @@ namespace AnomalyLabeler
                     annotations.Add(new AnnotationV2(GetCurrentFrame(), LabelV2.Unclear, xStart, xEnd));
                 }
 
+                RopeImageOverlayCanvas.Children.Clear();
                 hasLabelingStarted = false;
             }
             else
             {
                 xStart = (int)(p.X);
+                if (xStart <= BorderSnapThreshold)
+                {
+                    xStart = 0;
+                }
+                AddVerticalLineToCanvas(RopeImageOverlayCanvas, xStart);
                 hasLabelingStarted = true;
             }
         }
         #endregion
 
         #region methods
+        private void AddVerticalLineToCanvas(Canvas canvas, int x)
+        {
+            var line = new Line();
+            line.X1 = x;
+            line.X2 = x;
+            line.Y1 = 0;
+            line.Y2 = canvas.Width - 1;
+            line.Stroke = Brushes.White;
+            line.StrokeThickness = 1;
+
+            canvas.Children.Add(line);
+        }
+
         private Gat.Controls.MessageBoxViewModel CreateMessageBox(int xStart, int xEnd)
         {
             var messageBox = (Gat.Controls.MessageBoxViewModel)(new Gat.Controls.MessageBoxView().FindResource("ViewModel"));

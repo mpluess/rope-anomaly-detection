@@ -7,7 +7,11 @@
         mc:Ignorable="d"
         Title="MainWindow" SizeToContent="WidthAndHeight" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
     <StackPanel>
-        <Image Name="RopeImageControl" Width="800" Height="608" MouseUp="RopeImageControl_MouseUp" />
+        <Grid>
+            <!-- Width and Height attributes will be overwritten after reading the RAW video file. -->
+            <Image Name="RopeImageControl" Width="800" Height="608" MouseUp="RopeImageControl_MouseUp" />
+            <Canvas Name="RopeImageOverlayCanvas" Width="800" Height="608" />
+        </Grid>
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

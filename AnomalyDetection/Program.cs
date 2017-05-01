@@ -19,10 +19,10 @@ namespace AnomalyDetection
     public class Program
     {
         private const bool DoSave = false;
-        private const bool DoLoad = true;
+        private const bool DoLoad = false;
 
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
-        private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.ann";
+        private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v1.frame_based.ann";
 
         private const string NSamplesPerFrameFile = "nSamplesPerFrame.txt";
         private const string XTrainFile = "XTrain.xml";
