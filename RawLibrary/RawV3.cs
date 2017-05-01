@@ -111,6 +111,9 @@ namespace RawLibrary
         private RAWHEADERV3 _rawHeader;
         private byte[] _fpnOffsetAndGain;
 
+        /// <summary>
+        /// Number of the next frame that will be read, not the one that was last read.
+        /// </summary>
         public ulong CurrentFrame
         {
             get;

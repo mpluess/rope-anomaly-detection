@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Xml.Serialization;
 using Emgu.Util;
 using System.Xml.Linq;
+using AnomalyModel;
 
 namespace AnomalyDetection
 {
@@ -30,7 +31,7 @@ namespace AnomalyDetection
 
         public static void Main(string[] args)
         {
-            var annotation = AnnotationReader.ReadAnnotations(PathToAnnotation);
+            var annotation = AnnotationsV1Reader.ReadAnnotations(PathToAnnotation);
 
             // Shuffling seems to have no effect on SVM training so we can skip it:
             // http://stackoverflow.com/questions/20731214/is-it-required-to-shuffle-the-training-data-for-svm-multi-classification

@@ -5,23 +5,29 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AnomalyDetection
+namespace AnomalyModel
 {
-    public class Annotation
+    /// <summary>
+    /// Frame-based annotation
+    /// </summary>
+    public class AnnotationsV1
     {
         public readonly ulong[] NormalFrames;
         public readonly ulong[] AnomalyFrames;
 
-        public Annotation(ulong[] normalFrames, ulong[] anomalyFrames)
+        public AnnotationsV1(ulong[] normalFrames, ulong[] anomalyFrames)
         {
             NormalFrames = normalFrames;
             AnomalyFrames = anomalyFrames;
         }
     }
 
-    public class AnnotationReader
+    /// <summary>
+    /// Frame-based annotation reader (.v1.frame_based.ann files)
+    /// </summary>
+    public class AnnotationsV1Reader
     {
-        public static Annotation ReadAnnotations(string pathToAnnotationFile)
+        public static AnnotationsV1 ReadAnnotations(string pathToAnnotationFile)
         {
             var allFrames = new SortedSet<ulong>();
             var anomalyFrames = new SortedSet<ulong>();
@@ -43,7 +49,7 @@ namespace AnomalyDetection
             }
             var normalFrames = new SortedSet<ulong>(allFrames.Except(anomalyFrames));
 
-            return new Annotation(normalFrames.ToArray(), anomalyFrames.ToArray());
+            return new AnnotationsV1(normalFrames.ToArray(), anomalyFrames.ToArray());
         }
 
         private static void AddRangeToSet(string[] range, ISet<ulong> set)

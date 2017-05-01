@@ -74,7 +74,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AnnotationReader.cs" />
     <Compile Include="HogTransformer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -87,6 +86,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\AnomalyModel\AnomalyModel.csproj">
+      <Project>{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}</Project>
+      <Name>AnomalyModel</Name>
+    </ProjectReference>
     <ProjectReference Include="..\RawLibrary\RawLibrary.csproj">
       <Project>{a98151f1-1a8d-4f01-b022-4075a0bc5162}</Project>
       <Name>RawLibrary</Name>

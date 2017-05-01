@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnomalyDetection", "Anomaly
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RawLibrary", "RawLibrary\RawLibrary.csproj", "{A98151F1-1A8D-4F01-B022-4075A0BC5162}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnomalyLabeler", "AnomalyLabeler\AnomalyLabeler.csproj", "{916B8FB0-E3E7-40BC-B2B6-1DA9BE381B89}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnomalyModel", "AnomalyModel\AnomalyModel.csproj", "{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{A98151F1-1A8D-4F01-B022-4075A0BC5162}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A98151F1-1A8D-4F01-B022-4075A0BC5162}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A98151F1-1A8D-4F01-B022-4075A0BC5162}.Release|Any CPU.Build.0 = Release|Any CPU
+		{916B8FB0-E3E7-40BC-B2B6-1DA9BE381B89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{916B8FB0-E3E7-40BC-B2B6-1DA9BE381B89}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{916B8FB0-E3E7-40BC-B2B6-1DA9BE381B89}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{916B8FB0-E3E7-40BC-B2B6-1DA9BE381B89}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FD72818-AF5C-4F9C-A62F-58E40EDAA4CB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
