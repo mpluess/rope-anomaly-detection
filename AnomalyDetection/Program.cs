@@ -18,11 +18,11 @@ namespace AnomalyDetection
 {
     public class Program
     {
-        private const bool DoSave = false;
+        private const bool DoSave = true;
         private const bool DoLoad = false;
 
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
-        private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v1.frame_based.ann";
+        private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
 
         private const string NSamplesPerFrameFile = "nSamplesPerFrame.txt";
         private const string XTrainFile = "XTrain.xml";
@@ -33,8 +33,6 @@ namespace AnomalyDetection
         {
             var annotation = AnnotationsV1Reader.ReadAnnotations(PathToAnnotation);
 
-            // Shuffling seems to have no effect on SVM training so we can skip it:
-            // http://stackoverflow.com/questions/20731214/is-it-required-to-shuffle-the-training-data-for-svm-multi-classification
             var anomalyFrames = annotation.AnomalyFrames;
             var normalFramesTest = annotation.NormalFrames.Take(anomalyFrames.Length).ToArray();
             var normalFramesTrain = annotation.NormalFrames.Except(normalFramesTest).ToArray();

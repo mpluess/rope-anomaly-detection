@@ -18,52 +18,12 @@ using System.Windows.Shapes;
 
 namespace AnomalyLabeler
 {
-    class AnnotationV2Comparer : IComparer<AnnotationV2>
-    {
-        public int Compare(AnnotationV2 a, AnnotationV2 b)
-        {
-            if (a.Frame < b.Frame)
-            {
-                return -1;
-            }
-            else if (a.Frame > b.Frame)
-            {
-                return 1;
-            }
-            else
-            {
-                if (a.XStart < b.XStart)
-                {
-                    return -1;
-                }
-                else if (a.XStart > b.XStart)
-                {
-                    return 1;
-                }
-                else
-                {
-                    if (a.XEnd < b.XEnd)
-                    {
-                        return -1;
-                    }
-                    else if (a.XEnd > b.XEnd)
-                    {
-                        return 1;
-                    }
-                    else
-                    {
-                        return 0;
-                    }
-                }
-            }
-        }
-    }
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
+        // Config
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
         // private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
         private const string PathToAnnotation = @"test.v2.anomaly_based.ann";
@@ -76,13 +36,15 @@ namespace AnomalyLabeler
         /// </summary>
         private const int BorderSnapThreshold = 5;
 
+
+        // Attributes
         private RawImage raw;
 
         private bool hasLabelingStarted;
         private int xStart;
 
-        private SortedSet<ulong> annotatedFrames;
-        private SortedSet<AnnotationV2> annotations;
+        private ISet<ulong> annotatedFrames;
+        private List<AnnotationV2> annotations;
 
         public MainWindow()
         {
@@ -102,7 +64,7 @@ namespace AnomalyLabeler
             raw = new RawImage(new FileInfo(PathToVideo));
             raw.ReadFrame(StartFrame);
 
-            CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
+            CurrentFrameTextBlock.Text = $"Current frame: {GetCurrentFrame()}";
 
             RopeImageControl.Source = raw.Source;
             RopeImageControl.Width = raw.ImageWidth;
@@ -111,17 +73,26 @@ namespace AnomalyLabeler
             RopeImageOverlayCanvas.Height = raw.ImageHeight;
 
             hasLabelingStarted = false;
-            annotatedFrames = new SortedSet<ulong>();
-            annotations = new SortedSet<AnnotationV2>(new AnnotationV2Comparer());
+            annotatedFrames = new HashSet<ulong>();
+            annotations = new List<AnnotationV2>();
         }
 
         #region callbacks
         private void NextButton_Click(object sender, RoutedEventArgs e)
         {
             annotatedFrames.Add(GetCurrentFrame());
-            WriteAnnotationsFile();
+            AnnotationsV2Writer.Write(PathToAnnotation, annotatedFrames, annotations);
 
             raw.ReadNextFrame();
+            CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
+        }
+
+        private void PreviousButton_Click(object sender, RoutedEventArgs e)
+        {
+            annotatedFrames.Add(GetCurrentFrame());
+            AnnotationsV2Writer.Write(PathToAnnotation, annotatedFrames, annotations);
+
+            raw.ReadPreviousFrame();
             CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
         }
 
@@ -204,21 +175,6 @@ namespace AnomalyLabeler
         private ulong GetCurrentFrame()
         {
             return raw.Raw.CurrentFrame - 1;
-        }
-
-        private void WriteAnnotationsFile()
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine("HEADER");
-            builder.AppendLine($"annotated_frames={string.Join(",", annotatedFrames)}");
-            builder.AppendLine();
-            builder.AppendLine("DATA");
-            foreach (var annotation in annotations)
-            {
-                builder.AppendLine($"{annotation.Frame},{annotation.Label},{annotation.XStart},{annotation.XEnd}");
-            }
-
-            File.WriteAllText(PathToAnnotation, builder.ToString());
         }
         #endregion
     }

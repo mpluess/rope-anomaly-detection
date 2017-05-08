@@ -16,9 +16,11 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Name="CurrentFrameTextBlock" HorizontalAlignment="Left" />
-            <Button Grid.Column="1" Name="NextButton" Content="Save &amp; Next" Click="NextButton_Click" Width="100" Height="40" HorizontalAlignment="Right" />
+            <Button Grid.Column="0" Name="PreviousButton" Content="Save &amp; Previous" Click="PreviousButton_Click" Width="100" Height="40" HorizontalAlignment="Left" />
+            <TextBlock Grid.Column="1" Name="CurrentFrameTextBlock" HorizontalAlignment="Center" />
+            <Button Grid.Column="2" Name="NextButton" Content="Save &amp; Next" Click="NextButton_Click" Width="100" Height="40" HorizontalAlignment="Right" />
         </Grid>
     </StackPanel>
 </Window>
