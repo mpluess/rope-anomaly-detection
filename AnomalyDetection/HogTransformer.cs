@@ -44,12 +44,12 @@ namespace AnomalyDetection
     /// </summary>
     public class HogTransformer
     {
-        private readonly int CellWidth;
-        private readonly int CellHeight;
-        private readonly double MaxBackgroundIntensity;
-        private readonly double EdgeThreshold;
-        private readonly double BackgroundThreshold;
-        private readonly int NBins;
+        public readonly int CellWidth;
+        public readonly int CellHeight;
+        public readonly double MaxBackgroundIntensity;
+        public readonly double EdgeThreshold;
+        public readonly double BackgroundThreshold;
+        public readonly int NBins;
 
         /// <summary>
         /// Width of the segmented rope.
@@ -124,7 +124,7 @@ namespace AnomalyDetection
             foreach (var frameWithRopeLocations in Enumerable.Zip(frames, ropeLocations, (frameNr, locations) => new { frameNr = frameNr, ropeLocations = locations }))
             {
                 raw.ReadFrame(frameWithRopeLocations.frameNr);
-                using (Mat ropeFrame = SvmUtility.RawToMat(raw))
+                using (Mat ropeFrame = MatUtility.RawToMat(raw))
                 {
                     AddFeatureVector(samples, ropeFrame, frameWithRopeLocations.ropeLocations);
                 }
@@ -132,7 +132,7 @@ namespace AnomalyDetection
             // transform the features for SVM
             // TODO refactor GetFeatureVector to make this unnecessary
             Console.WriteLine($"[{DateTime.Now}] HogTransformer.Transform: calling ConvertToMl");
-            return SvmUtility.ConvertToMl(samples);
+            return MatUtility.ConvertToMl(samples);
         }
 
         /// <summary>
@@ -158,7 +158,7 @@ namespace AnomalyDetection
             foreach (ulong frameNr in frames)
             {
                 raw.ReadFrame(frameNr);
-                using (Mat ropeFrame = SvmUtility.RawToMat(raw))
+                using (Mat ropeFrame = MatUtility.RawToMat(raw))
                 {
                     ropeLocations[rlIndex] = SegmentRopeForFrame(ropeFrame, frameNr);
                     ++rlIndex;

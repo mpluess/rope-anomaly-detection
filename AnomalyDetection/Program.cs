@@ -25,19 +25,27 @@ namespace AnomalyDetection
         private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
 
         private const string NSamplesPerFrameFile = "nSamplesPerFrame.txt";
+        private const string CellWidthFile = "cellWidth.txt";
         private const string XTrainFile = "XTrain.xml";
         private const string XTestNormalFile = "XTestNormal.xml";
         private const string XTestAnomalyFile = "XTestAnomaly.xml";
 
         public static void Main(string[] args)
         {
-            var annotation = AnnotationsV1Reader.ReadAnnotations(PathToAnnotation);
+            var annotations = AnnotationsV2Reader.Read(PathToAnnotation);
 
-            var anomalyFrames = annotation.AnomalyFrames;
-            var normalFramesTest = annotation.NormalFrames.Take(anomalyFrames.Length).ToArray();
-            var normalFramesTrain = annotation.NormalFrames.Except(normalFramesTest).ToArray();
+            // Shuffle normal frames before train-test-split to make test set more diverse. Use seed for reproducibility.
+            // Otherwise, shuffling seems to have no effect on SVM training so this is the only place we have to do it:
+            // http://stackoverflow.com/questions/20731214/is-it-required-to-shuffle-the-training-data-for-svm-multi-classification
+            var random = new Random(42);
+            var normalFramesTest = annotations.NormalFrames
+                .OrderBy(l => random.NextDouble())
+                .Take(annotations.AnomalyFrames.Length)
+                .ToArray();
+            var normalFramesTrain = annotations.NormalFrames.Except(normalFramesTest).ToArray();
 
             int nSamplesPerFrame;
+            int cellWidth;
             Mat XTrain;
             Mat XTestNormal;
             Mat XTestAnomaly;
@@ -46,6 +54,7 @@ namespace AnomalyDetection
                 Console.WriteLine($"[{DateTime.Now}] Program.Main: reading matrices from filesystem");
 
                 nSamplesPerFrame = int.Parse(File.ReadAllText(NSamplesPerFrameFile));
+                cellWidth = int.Parse(File.ReadAllText(CellWidthFile));
                 XTrain = new Mat();
                 new FileStorage(XTrainFile, FileStorage.Mode.Read).GetFirstTopLevelNode().ReadMat(XTrain);
                 XTestNormal = new Mat();
@@ -57,22 +66,37 @@ namespace AnomalyDetection
             {
                 var raw = new RawImage(new FileInfo(PathToVideo));
                 var featureTransformer = new HogTransformer();
-                // TODO normalize
                 XTrain = featureTransformer.FitTransform(raw, normalFramesTrain);
                 Debug.Assert(XTrain.Rows % normalFramesTrain.Length == 0);
                 nSamplesPerFrame = XTrain.Rows / normalFramesTrain.Length;
+                cellWidth = featureTransformer.CellWidth;
 
                 XTestNormal = featureTransformer.Transform(raw, normalFramesTest);
-                XTestAnomaly = featureTransformer.Transform(raw, anomalyFrames);
+                XTestAnomaly = featureTransformer.Transform(raw, annotations.AnomalyFrames);
 
                 if (DoSave)
                 {
                     Console.WriteLine($"[{DateTime.Now}] Program.Main: writing matrices to filesystem");
 
                     File.WriteAllText(NSamplesPerFrameFile, nSamplesPerFrame.ToString());
+                    File.WriteAllText(CellWidthFile, cellWidth.ToString());
                     new FileStorage(XTrainFile, FileStorage.Mode.Write).Write(XTrain);
                     new FileStorage(XTestNormalFile, FileStorage.Mode.Write).Write(XTestNormal);
                     new FileStorage(XTestAnomalyFile, FileStorage.Mode.Write).Write(XTestAnomaly);
+                }
+            }
+            var yTestAnomaly = new int[XTestAnomaly.Rows];
+            for (int i = 0; i < yTestAnomaly.Length; ++i)
+            {
+                yTestAnomaly[i] = 1;
+            }
+            foreach (var anomalyRegion in annotations.AnomalyRegions)
+            {
+                int offset = Array.IndexOf(annotations.AnomalyFrames, anomalyRegion.Frame) * nSamplesPerFrame;
+                // Math.Min is necessary because the last pixel columns that don't make up a whole cell are truncated by the feature transformer.
+                for (int i = anomalyRegion.XStart / cellWidth; i < Math.Min(nSamplesPerFrame, anomalyRegion.XEnd / cellWidth + 1); ++i)
+                {
+                    yTestAnomaly[offset + i] = 0;
                 }
             }
 
@@ -90,58 +114,25 @@ namespace AnomalyDetection
 
             var classifier = new SvmOneClassClassifier();
 
-            // perfect specificity
+            // perfect specificity (per-frame grid search)
             classifier.Fit(XTrain, 0.8, 0.004);
 
-            // better recall
+            // better recall, specificity too low though (per-frame grid search)
             // classifier.Fit(XTrain, 2.0, 0.003);
 
-            Predict(classifier, XTestNormal, normalFramesTest, XTestAnomaly, anomalyFrames, nSamplesPerFrame, verbose: true);
+            // TODO anomaly metric
+            // TODO grid search
+
             Console.WriteLine();
-        }
+            Console.WriteLine("TRAIN");
+            var yTrainPredicted = classifier.Predict(XTrain);
+            Metrics.PrintPerSampleMetrics(yTrainPredicted);
+            Console.WriteLine();
 
-        private static void Predict(
-            SvmOneClassClassifier classifier,
-            Mat XTestNormal, ulong[] normalFrames, Mat XTestAnomaly, ulong[] anomalyFrames,
-            int nSamplesPerFrame, bool verbose = false)
-        {
-            int tp = 0;
-            int tn = 0;
-            int fp = 0;
-            int fn = 0;
-            // TODO print matching frameNr
-            Console.WriteLine("Normal frames:");
-            foreach (bool isAnomaly in classifier.Predict(XTestNormal, normalFrames, nSamplesPerFrame, verbose))
-            {
-                if (isAnomaly)
-                {
-                    fp += 1;
-                }
-                else
-                {
-                    tn += 1;
-                }
-            }
-
-            Console.WriteLine("Anomaly frames:");
-            foreach (bool isAnomaly in classifier.Predict(XTestAnomaly, anomalyFrames, nSamplesPerFrame, verbose))
-            {
-                if (isAnomaly)
-                {
-                    tp += 1;
-                }
-                else
-                {
-                    fn += 1;
-                }
-            }
-
-            //double accuracy = (double)(tp + tn) / (tp + tn + fp + fn);
-            double specificity = (double)tn / (tn + fp);
-            double recall = (double)tp / (tp + fn);
-            double precision = (double)tp / (tp + fp);
-            Console.WriteLine($"TP={tp}, TN={tn}, FP={fp}, FN={fn}");
-            Console.WriteLine($"specificity={specificity}, recall={recall} (precision={precision})");
+            Console.WriteLine("TEST");
+            var yTestNormalPredicted = classifier.Predict(XTestNormal);
+            var yTestAnomalyPredicted = classifier.Predict(XTestAnomaly);
+            Metrics.PrintPerSampleMetrics(yTestNormalPredicted, yTestAnomaly, yTestAnomalyPredicted);
         }
     }
 }

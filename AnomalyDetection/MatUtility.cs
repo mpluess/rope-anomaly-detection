@@ -10,9 +10,9 @@ using System.IO;
 namespace AnomalyDetection
 {
     /// <summary>
-    /// This class contains static methods used for the training and analysis of rope images.
+    /// Helper methods to handle Mat conversions / reshapings.
     /// </summary>
-    public class SvmUtility
+    public class MatUtility
     {
         /// <summary>
         /// Converts a RawImage to Mat.

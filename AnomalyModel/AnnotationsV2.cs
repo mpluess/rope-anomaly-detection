@@ -125,6 +125,12 @@ namespace AnomalyModel
             None, Header, Data
         }
 
+        /// <summary>
+        /// Read annotation information from file.
+        /// NormalFrames, AnomalyFrames and UnclearFrames are sorted (ascending), AnomalyRegions and UnclearRegions aren't.
+        /// </summary>
+        /// <param name="pathToAnnotationFile"></param>
+        /// <returns></returns>
         public static AnnotationsV2 Read(string pathToAnnotationFile)
         {
             var readState = ReadState.None;

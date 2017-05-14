@@ -66,52 +66,20 @@ namespace AnomalyDetection
         /// <summary>
         /// Predicts a label for each sample using the fitted SVM model.
         /// One sample describes a part of the rope which is as wide as its diameter and CellWidth pixels high.
-        /// Aggregates these preliminary labels to mark each frame as an anomaly which has at least one sample
-        /// labelled as an anomaly.
         /// </summary>
-        /// <param name="X"></param>
-        /// <param name="nSamplesPerFrame"></param>
-        /// <returns>Labels per frame: true = is an anomaly, false = no anomaly</returns>
-        public bool[] Predict(Mat X, ulong[] frames, int nSamplesPerFrame, bool verbose = false)
+        /// <param name="X">Feature matrix nSamples x nFeatures</param>
+        /// <returns>Labels per sample: 1 = normal rope, 0 = anomaly</returns>
+        public int[] Predict(Mat X)
         {
             Console.WriteLine($"[{DateTime.Now}] SvmOneClassClassifier.Predict: predicting labels with SVM");
             var resultMatrix = new Mat();
             Model.Predict(X, resultMatrix);
 
-            Console.WriteLine($"[{DateTime.Now}] SvmOneClassClassifier.Predict: reading results and assembling final labels per frame");
             Debug.Assert(resultMatrix.Cols == 1);
             float[] result = new float[resultMatrix.Rows];
             Marshal.Copy(resultMatrix.DataPointer, result, 0, result.Length);
 
-            Debug.Assert(result.Length % nSamplesPerFrame == 0);
-            bool[] labelsPerFrame = new bool[result.Length / nSamplesPerFrame];
-            Debug.Assert(labelsPerFrame.Length == frames.Length);
-            int lpfIndex = 0;
-            for (int offset = 0; offset < result.Length; offset += nSamplesPerFrame)
-            {
-                bool isAnomaly = false;
-                var resultPerFrame = result.Skip(offset).Take(nSamplesPerFrame);
-                if (verbose)
-                {
-                    Console.WriteLine($"frameNr={frames[lpfIndex]}");
-                    Console.WriteLine(resultPerFrame.Sum());
-                    Console.WriteLine(string.Join(",", resultPerFrame));
-                }
-                
-                foreach (var f in resultPerFrame)
-                {
-                    if (f == 0)
-                    {
-                        isAnomaly = true;
-                        break;
-                    }
-                }
-
-                labelsPerFrame[lpfIndex] = isAnomaly;
-                ++lpfIndex;
-            }
-
-            return labelsPerFrame;
+            return result.Select(f => (int)(Math.Round(f))).ToArray();
         }
 
         public void Save(string pathToModelFile)
