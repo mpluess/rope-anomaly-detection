@@ -18,8 +18,8 @@ namespace AnomalyDetection
 {
     public class Program
     {
-        private const bool DoSave = true;
-        private const bool DoLoad = false;
+        private const bool DoSave = false;
+        private const bool DoLoad = true;
 
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
         private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
@@ -90,6 +90,7 @@ namespace AnomalyDetection
             {
                 yTestAnomaly[i] = 1;
             }
+            var anomalyIdToYTestAnomalyIndices = new Dictionary<string, ISet<int>>();
             foreach (var anomalyRegion in annotations.AnomalyRegions)
             {
                 int offset = Array.IndexOf(annotations.AnomalyFrames, anomalyRegion.Frame) * nSamplesPerFrame;
@@ -97,6 +98,11 @@ namespace AnomalyDetection
                 for (int i = anomalyRegion.XStart / cellWidth; i < Math.Min(nSamplesPerFrame, anomalyRegion.XEnd / cellWidth + 1); ++i)
                 {
                     yTestAnomaly[offset + i] = 0;
+                    if (!anomalyIdToYTestAnomalyIndices.ContainsKey(anomalyRegion.AnomalyId))
+                    {
+                        anomalyIdToYTestAnomalyIndices[anomalyRegion.AnomalyId] = new HashSet<int>();
+                    }
+                    anomalyIdToYTestAnomalyIndices[anomalyRegion.AnomalyId].Add(offset + i);
                 }
             }
 
@@ -120,19 +126,18 @@ namespace AnomalyDetection
             // better recall, specificity too low though (per-frame grid search)
             // classifier.Fit(XTrain, 2.0, 0.003);
 
-            // TODO anomaly metric
             // TODO grid search
 
             Console.WriteLine();
             Console.WriteLine("TRAIN");
             var yTrainPredicted = classifier.Predict(XTrain);
-            Metrics.PrintPerSampleMetrics(yTrainPredicted);
+            Metrics.PrintMetrics(yTrainPredicted);
             Console.WriteLine();
 
             Console.WriteLine("TEST");
             var yTestNormalPredicted = classifier.Predict(XTestNormal);
             var yTestAnomalyPredicted = classifier.Predict(XTestAnomaly);
-            Metrics.PrintPerSampleMetrics(yTestNormalPredicted, yTestAnomaly, yTestAnomalyPredicted);
+            Metrics.PrintMetrics(yTestNormalPredicted, yTestAnomaly, yTestAnomalyPredicted, anomalyIdToYTestAnomalyIndices);
         }
     }
 }

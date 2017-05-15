@@ -19,7 +19,10 @@ namespace AnomalyDetection
         /// <param name="yNormalPredicted"></param>
         /// <param name="yAnomaly"></param>
         /// <param name="yAnomalyPredicted"></param>
-        public static void PrintPerSampleMetrics(int[] yNormalPredicted, int[] yAnomaly = null, int[] yAnomalyPredicted = null)
+        public static void PrintMetrics(
+            int[] yNormalPredicted,
+            int[] yAnomaly = null, int[] yAnomalyPredicted = null, Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices = null
+        )
         {
             int tp = 0;
             int tn = 0;
@@ -38,8 +41,16 @@ namespace AnomalyDetection
                 }
             }
 
-            if (yAnomaly != null && yAnomalyPredicted != null)
+            Dictionary<string, int> tpsPerAnomaly = null;
+            if (yAnomaly != null && yAnomalyPredicted != null && anomalyIdToYTestAnomalyIndices != null)
             {
+                tpsPerAnomaly = new Dictionary<string, int>();
+                foreach (var anomalyId in anomalyIdToYTestAnomalyIndices.Keys)
+                {
+                    tpsPerAnomaly[anomalyId] = 0;
+                }
+
+                int i = 0;
                 foreach (var labels in Enumerable.Zip(
                     yAnomaly, yAnomalyPredicted, (truth, predicted) => new { truth, predicted }
                 ))
@@ -55,30 +66,47 @@ namespace AnomalyDetection
                     else if (labels.truth == 0 && labels.predicted == 0)
                     {
                         ++tp;
+                        foreach (var anomalyId in anomalyIdToYTestAnomalyIndices.Keys)
+                        {
+                            if (anomalyIdToYTestAnomalyIndices[anomalyId].Contains(i))
+                            {
+                                ++tpsPerAnomaly[anomalyId];
+                            }
+                        }
                     }
                     else if (labels.truth == 0 && labels.predicted == 1)
                     {
                         ++fn;
                     }
+
+                    ++i;
                 }
             }
 
-            PrintMetrics(tp, tn, fp, fn);
+            PrintPerSampleMetrics(tp, tn, fp, fn);
+            if (tpsPerAnomaly != null)
+            {
+                PrintPerAnomalyMetrics(tpsPerAnomaly, fp);
+            }
         }
 
-        public static void PrintPerAnomalyMetrics()
-        {
-
-        }
-
-        private static void PrintMetrics(int tp, int tn, int fp, int fn)
+        private static void PrintPerSampleMetrics(int tp, int tn, int fp, int fn)
         {
             //double accuracy = (double)(tp + tn) / (tp + tn + fp + fn);
             double specificity = (double)tn / (tn + fp);
             double recall = (double)tp / (tp + fn);
             double precision = (double)tp / (tp + fp);
+            Console.WriteLine("Per-sample metrics:");
             Console.WriteLine($"TP={tp}, TN={tn}, FP={fp}, FN={fn}");
             Console.WriteLine($"specificity={specificity}, recall={recall} (precision={precision})");
+        }
+
+        private static void PrintPerAnomalyMetrics(Dictionary<string, int> tpsPerAnomaly, int fpsSampleLevel)
+        {
+            int tp = tpsPerAnomaly.Values.Where(count => count > 0).Count();
+            int fn = tpsPerAnomaly.Keys.Count - tp;
+            Console.WriteLine($"TP={tp}, FN={fn}, FP (on sample level)={fpsSampleLevel}");
+            Console.WriteLine($"Missed anomalies: {string.Join(", ", tpsPerAnomaly.Where(kv => kv.Value == 0).Select(kv => kv.Key).OrderBy(k => k))}");
         }
     }
 }
