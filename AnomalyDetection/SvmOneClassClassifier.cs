@@ -12,11 +12,8 @@ using System.Threading.Tasks;
 
 namespace AnomalyDetection
 {
-    // TODO save / load
     /// <summary>
-    /// [1] http://stackoverflow.com/questions/32099618/emgu-cv-svm-example-not-working-on-version-3-0-0
-    /// [2] http://www.emgu.com/wiki/index.php/SVM_(Support_Vector_Machine)_in_CSharp
-    /// [3] http://stackoverflow.com/questions/18518852/every-time-getting-positive-result-while-predicting-from-svm
+    /// TODO SVM = unmanaged, memory leak possible?
     /// </summary>
     public class SvmOneClassClassifier
     {
@@ -34,33 +31,30 @@ namespace AnomalyDetection
             Model.Type = SVM.SvmType.OneClass;
             Model.SetKernel(SVM.SvmKernelType.Rbf);
 
-            // Irrelevant for one-class
+            // Irrelevant for OpenCV's one-class implementation (NuSVM)
             Model.C = 1;
 
             Model.Coef0 = 0;
             Model.Degree = 3;
 
-            // see paper - where?
-            //Model.Gamma = 1 / (2 * Math.Exp(-2.5));
-
-            // sklearn: 1 / n_features
-            //Model.Gamma = 1 / ((double)(X.Cols));
-
+            // Usual range for RBF kernel: [10^-3, 10^3]
             Model.Gamma = gamma;
 
             // Small value = few samples will be classified as outliers
             // Big value = a lot of samples will be classified as outliers
+            // Range: ]0, 1[
             Model.Nu = nu;
 
             // epsilon
             // Irrelevant for one-class
             Model.P = 0;
 
-            Model.TermCriteria = new MCvTermCriteria(100, 0.00001);
+            // OpenCV / EmguCV doesn't warn you when the optimization has not yet converged after maxIteration,
+            // so better set this high enough! The flag returned by Train() doesn't give any clues about convergence either.
+            Model.TermCriteria = new MCvTermCriteria(10000, 0.00001);
 
             var trainData = new TrainData(X, DataLayoutType.RowSample, new Mat());
-            bool trained = Model.Train(trainData);
-            Console.WriteLine($"trained={trained}");
+            Model.Train(trainData);
         }
 
         /// <summary>

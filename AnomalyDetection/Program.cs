@@ -85,11 +85,13 @@ namespace AnomalyDetection
                     new FileStorage(XTestAnomalyFile, FileStorage.Mode.Write).Write(XTestAnomaly);
                 }
             }
+
             var yTestAnomaly = new int[XTestAnomaly.Rows];
             for (int i = 0; i < yTestAnomaly.Length; ++i)
             {
                 yTestAnomaly[i] = 1;
             }
+
             var anomalyIdToYTestAnomalyIndices = new Dictionary<string, ISet<int>>();
             foreach (var anomalyRegion in annotations.AnomalyRegions)
             {
@@ -106,38 +108,87 @@ namespace AnomalyDetection
                 }
             }
 
-            //foreach (double gamma in new double[] { 0.8, 2.0 })
-            //{
-            //    foreach (double nu in new double[] { 0.004, 0.003, 0.0015 })
-            //    {
-            //        Console.WriteLine($"gamma={gamma}, nu={nu}");
-            //        var classifier = new SvmOneClassClassifier();
-            //        classifier.Fit(XTrain, gamma, nu);
-            //        Predict(classifier, XTestNormal, XTestAnomaly, nSamplesPerFrame);
-            //        Console.WriteLine();
-            //    }
-            //}
+            var yTestAnomalyUnclearIndices = new HashSet<int>();
+            foreach (var unclearRegion in annotations.UnclearRegions)
+            {
+                int index = Array.IndexOf(annotations.AnomalyFrames, unclearRegion.Frame);
+                if (index != -1)
+                {
+                    int offset = index * nSamplesPerFrame;
+                    // Math.Min is necessary because the last pixel columns that don't make up a whole cell are truncated by the feature transformer.
+                    for (int i = unclearRegion.XStart / cellWidth; i < Math.Min(nSamplesPerFrame, unclearRegion.XEnd / cellWidth + 1); ++i)
+                    {
+                        yTestAnomalyUnclearIndices.Add(offset + i);
+                    }
+                }
+            }
 
+            FitPredict(
+                XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
+                anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
+                nSamplesPerFrame
+            );
+            //GridSearch(
+            //    XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
+            //    anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
+            //    nSamplesPerFrame
+            //);
+        }
+
+        private static void FitPredict(
+            Mat XTrain, Mat XTestNormal, Mat XTestAnomaly, int[] yTestAnomaly,
+            Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices, HashSet<int> yTestAnomalyUnclearIndices,
+            int nSamplesPerFrame
+        )
+        {
             var classifier = new SvmOneClassClassifier();
 
-            // perfect specificity (per-frame grid search)
-            classifier.Fit(XTrain, 0.8, 0.004);
-
-            // better recall, specificity too low though (per-frame grid search)
-            // classifier.Fit(XTrain, 2.0, 0.003);
-
-            // TODO grid search
+            // Best recall with FpFramesPercentage < 50.0 according to a grid search on 21.05.2017.
+            classifier.Fit(XTrain, 10.0, 0.01);
 
             Console.WriteLine();
             Console.WriteLine("TRAIN");
             var yTrainPredicted = classifier.Predict(XTrain);
-            Metrics.PrintMetrics(yTrainPredicted);
+            MetricsUtil.PrintMetrics(yTrainPredicted, nSamplesPerFrame);
             Console.WriteLine();
 
             Console.WriteLine("TEST");
             var yTestNormalPredicted = classifier.Predict(XTestNormal);
             var yTestAnomalyPredicted = classifier.Predict(XTestAnomaly);
-            Metrics.PrintMetrics(yTestNormalPredicted, yTestAnomaly, yTestAnomalyPredicted, anomalyIdToYTestAnomalyIndices);
+            MetricsUtil.PrintMetrics(
+                yTestNormalPredicted, nSamplesPerFrame,
+                yTestAnomaly, yTestAnomalyPredicted, anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices
+            );
+        }
+
+        private static void GridSearch(
+            Mat XTrain, Mat XTestNormal, Mat XTestAnomaly, int[] yTestAnomaly,
+            Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices, HashSet<int> yTestAnomalyUnclearIndices,
+            int nSamplesPerFrame
+        )
+        {
+            var results = new List<Tuple<double, double, Metrics>>();
+            foreach (double gamma in new double[] { 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0 })
+            {
+                foreach (double nu in new double[] { 0.00001, 0.0001, 0.001, 0.01, 0.1 })
+                {
+                    Console.WriteLine($"gamma={gamma}, nu={nu}");
+                    var classifier = new SvmOneClassClassifier();
+                    classifier.Fit(XTrain, gamma, nu);
+                    var yTestNormalPredicted = classifier.Predict(XTestNormal);
+                    var yTestAnomalyPredicted = classifier.Predict(XTestAnomaly);
+                    var metrics = MetricsUtil.CalculateMetrics(
+                        yTestNormalPredicted, nSamplesPerFrame,
+                        yTestAnomaly, yTestAnomalyPredicted, anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices
+                    );
+                    results.Add(Tuple.Create(gamma, nu, metrics));
+                }
+            }
+            foreach (var result in results.Where(r => r.Item3.FpFramesPercentage < 50.0).OrderByDescending(r => r.Item3.TpAnomalyLevel).ThenByDescending(r => r.Item3.Recall))
+            {
+                Console.WriteLine($"gamma={result.Item1}, nu={result.Item2}");
+                MetricsUtil.PrintMetrics(result.Item3);
+            }
         }
     }
 }
