@@ -12,7 +12,7 @@ namespace AnomalyDetection
     /// <summary>
     /// Helper methods to handle Mat conversions / reshapings.
     /// </summary>
-    public class MatUtility
+    public class MatUtil
     {
         /// <summary>
         /// Converts a RawImage to Mat.
@@ -38,15 +38,9 @@ namespace AnomalyDetection
 
         /// <summary>
         /// Converts the train data to fit as input for SVM.
-        /// 
-        /// Convert training/testing set to be used by OpenCV Machine Learning algorithms.
-        /// TrainData is a matrix of size(#samples x max(#cols,#rows) per samples), in 32FC1.
-        /// Transposition of samples are made if needed.
-        /// 
-        /// Rewritten from: [source] TODO
         /// </summary>
-        /// <param name="trainSamples"></param>
-        /// <returns></returns>
+        /// <param name="trainSamples">Vector of length nSamples containing Mats of size 1 x nFeatures.</param>
+        /// <returns>Mat of size nSamples x nFeatures</returns>
         public static Mat ConvertToMl(VectorOfMat trainSamples)
         {
             int rows = trainSamples.Size;

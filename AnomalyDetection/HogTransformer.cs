@@ -99,6 +99,22 @@ namespace AnomalyDetection
         }
 
         /// <summary>
+        /// Segments the image, determines the minimum width of rope and transforms frames to a HOG feature matrix.
+        /// </summary>
+        /// <param name="raw"></param>
+        /// <param name="normalFrames"></param>
+        /// <returns>HOG feature matrix with dimensions (|normalFrames| * FrameWidth / CellWidth) x (NBins * RopeWidthCells)</returns>
+        public Mat FitTransform(RawImage raw, ulong[] normalFrames)
+        {
+            Console.WriteLine($"[{DateTime.Now}] HogTransformer.FitTransform: calling Fit");
+            var ropeLocations = Fit(raw, normalFrames);
+
+
+            Console.WriteLine($"[{DateTime.Now}] HogTransformer.FitTransform: calling Transform");
+            return Transform(raw, normalFrames, ropeLocations);
+        }
+
+        /// <summary>
         /// Transforms frames to a HOG feature matrix.
         /// One row of the matrix = one sample describes a part of the rope which is CellWidth pixels high
         /// and RopeWidthCells * CellHeight pixels wide (= the whole rope diameter).
@@ -124,31 +140,15 @@ namespace AnomalyDetection
             foreach (var frameWithRopeLocations in Enumerable.Zip(frames, ropeLocations, (frameNr, locations) => new { frameNr = frameNr, ropeLocations = locations }))
             {
                 raw.ReadFrame(frameWithRopeLocations.frameNr);
-                using (Mat ropeFrame = MatUtility.RawToMat(raw))
+                using (Mat ropeFrame = MatUtil.RawToMat(raw))
                 {
                     AddFeatureVector(samples, ropeFrame, frameWithRopeLocations.ropeLocations);
                 }
             }
             // transform the features for SVM
-            // TODO refactor GetFeatureVector to make this unnecessary
+            // TODO refactor AddFeatureVector to make this unnecessary
             Console.WriteLine($"[{DateTime.Now}] HogTransformer.Transform: calling ConvertToMl");
-            return MatUtility.ConvertToMl(samples);
-        }
-
-        /// <summary>
-        /// Segments the image, determines the minimum width of rope and transforms frames to a HOG feature matrix.
-        /// </summary>
-        /// <param name="raw"></param>
-        /// <param name="normalFrames"></param>
-        /// <returns>HOG feature matrix with dimensions (|normalFrames| * FrameWidth / CellWidth) x (NBins * RopeWidthCells)</returns>
-        public Mat FitTransform(RawImage raw, ulong[] normalFrames)
-        {
-            Console.WriteLine($"[{DateTime.Now}] HogTransformer.FitTransform: calling Fit");
-            var ropeLocations = Fit(raw, normalFrames);
-
-
-            Console.WriteLine($"[{DateTime.Now}] HogTransformer.FitTransform: calling Transform");
-            return Transform(raw, normalFrames, ropeLocations);
+            return MatUtil.ConvertToMl(samples);
         }
 
         private RopeLocation[][] SegmentRopeForFrames(RawImage raw, ulong[] frames)
@@ -158,7 +158,7 @@ namespace AnomalyDetection
             foreach (ulong frameNr in frames)
             {
                 raw.ReadFrame(frameNr);
-                using (Mat ropeFrame = MatUtility.RawToMat(raw))
+                using (Mat ropeFrame = MatUtil.RawToMat(raw))
                 {
                     ropeLocations[rlIndex] = SegmentRopeForFrame(ropeFrame, frameNr);
                     ++rlIndex;

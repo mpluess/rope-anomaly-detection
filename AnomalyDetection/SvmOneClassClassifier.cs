@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 namespace AnomalyDetection
 {
     /// <summary>
-    /// TODO SVM = unmanaged, memory leak possible?
+    /// TODO SVM = unmanaged, memory leak possible? Mat in general?
     /// </summary>
     public class SvmOneClassClassifier
     {

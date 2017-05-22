@@ -74,12 +74,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions.cs" />
     <Compile Include="HogTransformer.cs" />
-    <Compile Include="Metrics.cs" />
+    <Compile Include="MetricsUtil.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StandardScaler.cs" />
     <Compile Include="SvmOneClassClassifier.cs" />
-    <Compile Include="MatUtility.cs" />
+    <Compile Include="MatUtil.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

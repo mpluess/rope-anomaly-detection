@@ -13,6 +13,7 @@ using System.Xml.Serialization;
 using Emgu.Util;
 using System.Xml.Linq;
 using AnomalyModel;
+using System.Text;
 
 namespace AnomalyDetection
 {
@@ -38,6 +39,13 @@ namespace AnomalyDetection
             // Otherwise, shuffling seems to have no effect on SVM training so this is the only place we have to do it:
             // http://stackoverflow.com/questions/20731214/is-it-required-to-shuffle-the-training-data-for-svm-multi-classification
             var random = new Random(42);
+
+            // Take as many normal frames as we have anomaly frames for testing.
+            // The reason for doing this is that the number of labeled frames is very limited and we want to use as many as possible for training.
+            //
+            // This is certainly not the perfect solution since it obviously changes the distribution of normal / anomaly samples pretty drastically.
+            // Since this is only relevant for false positives and the false positive metric is relative to the number of frames (percentage of frames with false positives),
+            // this is tolerable. Still this metric is slightly skewed since normal frames contain more false positives than anomaly frames.
             var normalFramesTest = annotations.NormalFrames
                 .OrderBy(l => random.NextDouble())
                 .Take(annotations.AnomalyFrames.Length)
@@ -73,6 +81,13 @@ namespace AnomalyDetection
 
                 XTestNormal = featureTransformer.Transform(raw, normalFramesTest);
                 XTestAnomaly = featureTransformer.Transform(raw, annotations.AnomalyFrames);
+
+                // Standardize data to mean 0, standard deviation 1.
+                var stdScaler = new StandardScaler();
+                stdScaler.Fit(XTrain);
+                XTrain = stdScaler.Transform(XTrain);
+                XTestNormal = stdScaler.Transform(XTestNormal);
+                XTestAnomaly = stdScaler.Transform(XTestAnomaly);
 
                 if (DoSave)
                 {
@@ -123,16 +138,16 @@ namespace AnomalyDetection
                 }
             }
 
-            FitPredict(
-                XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
-                anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
-                nSamplesPerFrame
-            );
-            //GridSearch(
+            //FitPredict(
             //    XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
             //    anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
             //    nSamplesPerFrame
             //);
+            GridSearch(
+                XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
+                anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
+                nSamplesPerFrame
+            );
         }
 
         private static void FitPredict(
@@ -143,8 +158,7 @@ namespace AnomalyDetection
         {
             var classifier = new SvmOneClassClassifier();
 
-            // Best recall with FpFramesPercentage < 50.0 according to a grid search on 21.05.2017.
-            classifier.Fit(XTrain, 10.0, 0.01);
+            classifier.Fit(XTrain, 0.01, 0.01);
 
             Console.WriteLine();
             Console.WriteLine("TRAIN");
@@ -164,13 +178,22 @@ namespace AnomalyDetection
         private static void GridSearch(
             Mat XTrain, Mat XTestNormal, Mat XTestAnomaly, int[] yTestAnomaly,
             Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices, HashSet<int> yTestAnomalyUnclearIndices,
-            int nSamplesPerFrame
+            int nSamplesPerFrame, string resultGridCsvFile = "grid_search_results.csv", string csvSeparator = ";"
         )
         {
+            var gammaValues = new double[] {
+                0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0,
+            };
+            var nuValues = new double[] {
+                0.00001, 0.0001, 0.001, 0.01, 0.1,
+            };
             var results = new List<Tuple<double, double, Metrics>>();
-            foreach (double gamma in new double[] { 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0 })
+            var resultGridCsv = new StringBuilder();
+            resultGridCsv.AppendLine(csvSeparator + string.Join(csvSeparator, gammaValues.Select(d => d.ToString())));
+            foreach (double nu in nuValues)
             {
-                foreach (double nu in new double[] { 0.00001, 0.0001, 0.001, 0.01, 0.1 })
+                resultGridCsv.Append(nu);
+                foreach (double gamma in gammaValues)
                 {
                     Console.WriteLine($"gamma={gamma}, nu={nu}");
                     var classifier = new SvmOneClassClassifier();
@@ -181,14 +204,20 @@ namespace AnomalyDetection
                         yTestNormalPredicted, nSamplesPerFrame,
                         yTestAnomaly, yTestAnomalyPredicted, anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices
                     );
+
                     results.Add(Tuple.Create(gamma, nu, metrics));
+                    resultGridCsv.Append(csvSeparator + $"{metrics.FnAnomalyLevel} / {metrics.Recall:F4} / {metrics.FpFramesPercentage:F2}");
                 }
+                resultGridCsv.AppendLine();
             }
+
             foreach (var result in results.Where(r => r.Item3.FpFramesPercentage < 50.0).OrderByDescending(r => r.Item3.TpAnomalyLevel).ThenByDescending(r => r.Item3.Recall))
             {
                 Console.WriteLine($"gamma={result.Item1}, nu={result.Item2}");
                 MetricsUtil.PrintMetrics(result.Item3);
             }
+
+            File.WriteAllText(resultGridCsvFile, resultGridCsv.ToString());
         }
     }
 }
