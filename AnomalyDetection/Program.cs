@@ -19,8 +19,8 @@ namespace AnomalyDetection
 {
     public class Program
     {
-        private const bool DoSave = false;
-        private const bool DoLoad = true;
+        private const bool DoSave = true;
+        private const bool DoLoad = false;
 
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
         private const string PathToAnnotation = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.v2.anomaly_based.ann";
@@ -86,6 +86,7 @@ namespace AnomalyDetection
                 var stdScaler = new StandardScaler();
                 stdScaler.Fit(XTrain);
                 XTrain = stdScaler.Transform(XTrain);
+                Console.WriteLine($"{XTrain.Rows} x {XTrain.Cols}");
                 XTestNormal = stdScaler.Transform(XTestNormal);
                 XTestAnomaly = stdScaler.Transform(XTestAnomaly);
 
@@ -138,6 +139,7 @@ namespace AnomalyDetection
                 }
             }
 
+            Console.WriteLine($"XTrain shape = {XTrain.Rows} x {XTrain.Cols}");
             //FitPredict(
             //    XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
             //    anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,

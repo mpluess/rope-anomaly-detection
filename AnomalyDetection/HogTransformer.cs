@@ -267,7 +267,6 @@ namespace AnomalyDetection
             Size windowSize = blockSize;
             Size blockStride = cellSize;
             Size windowStride = blockSize;
-            int sampleDimension = NBins * RopeWidthCells;
 
             // Image width: cut off last pixels not making up a whole cell anymore using integer division
             for (int cellX = 0; cellX < size.Width / cellSize.Width; ++cellX)
@@ -308,21 +307,49 @@ namespace AnomalyDetection
                     //Mat drawing = new Mat(); CvInvoke.CvtColor(image2, drawing, ColorConversion.Gray2Bgr);
                     //CvInvoke.NamedWindow("GetFeatureVector Debug", NamedWindowType.Normal); CvInvoke.Imshow("GetFeatureVector Debug", drawing); CvInvoke.WaitKey();
 
-                    HOGDescriptor hog = new HOGDescriptor(windowSize, blockSize, blockStride, cellSize, NBins);
-                    new Size();
-                    float[] hogResult = hog.Compute(ropeOnlyImage, windowStride);
-                    Debug.Assert(hogResult.Length == sampleDimension);
-                    float[] sample = new float[sampleDimension];
+                    var hog = new HOGDescriptor(windowSize, blockSize, blockStride, cellSize, nbins: NBins);
+                    float[] hogResult = hog.Compute(ropeOnlyImage, winStride: windowStride);
+                    Debug.Assert(hogResult.Length == NBins * RopeWidthCells);
 
-                    for (int i = 0; i < hogResult.Length; i += sampleDimension)
+                    // Add entropy feature per cell.
+                    var sample = new float[(NBins + 1) * RopeWidthCells];
+                    for (int cellNr = 0; cellNr < RopeWidthCells; ++cellNr)
                     {
-                        Array.Copy(hogResult, i, sample, 0, sampleDimension);
-                        Mat feature = new Mat(new Size(sampleDimension, 1), DepthType.Cv32F, 1);
-                        feature.SetTo(sample);
-                        samples.Push(feature);
+                        var cell = new float[NBins];
+                        for (int binNr = 0; binNr < NBins; ++binNr)
+                        {
+                            sample[cellNr*(NBins + 1) + binNr] = hogResult[cellNr*NBins + binNr];
+                            cell[binNr] = hogResult[cellNr * NBins + binNr];
+                        }
+
+                        // Return value per cell: vector gradient magnitudes, normalized with L2-hys per block, gamma-corrected.
+                        // For the entropy calculation we need probabilities per bin so we have to normalize the cell vector first (norm = 1).
+                        var probs = ToProbs(cell);
+                        float entropy = CalculateEntropy(probs);
+                        sample[cellNr * (NBins + 1) + NBins] = entropy;
                     }
+
+                    Mat feature = new Mat(new Size(sample.Length, 1), DepthType.Cv32F, 1);
+                    feature.SetTo(sample);
+                    samples.Push(feature);
                 }
             }
+        }
+
+        private float[] ToProbs(float[] vector)
+        {
+            foreach (float f in vector)
+            {
+                Debug.Assert(f >= 0.0f);
+            }
+
+            float sum = vector.Sum();
+            return vector.Select(f => f / sum).ToArray();
+        }
+
+        private float CalculateEntropy(float[] probs)
+        {
+            return -probs.Select(p => (float)(p * Math.Log(p, 2.0))).Sum();
         }
     }
 }
