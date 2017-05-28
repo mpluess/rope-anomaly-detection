@@ -93,7 +93,9 @@ namespace AnomalyDetection
             RopeWidthCells = ropeWidthsCells.Min();
             int maxRopeWidthCells = ropeWidthsCells.Max();
             Console.WriteLine($"Rope width global min: {RopeWidthCells}");
+            Console.WriteLine($"frames with min width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(RopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), RopeWidthCells)})"))}");
             Console.WriteLine($"Rope width global max: {maxRopeWidthCells}");
+            Console.WriteLine($"frames with max width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(maxRopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), maxRopeWidthCells)})"))}");
 
             return ropeLocations;
         }
@@ -248,6 +250,9 @@ namespace AnomalyDetection
 
                 if (startY != -1 && endY != -1)
                 {
+                    // Include edge
+                    --startY;
+
                     ropeLocations[cellX] = new RopeLocation(startY, endY);
                 }
                 else

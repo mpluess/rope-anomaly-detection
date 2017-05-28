@@ -140,16 +140,16 @@ namespace AnomalyDetection
             }
 
             Console.WriteLine($"XTrain shape = {XTrain.Rows} x {XTrain.Cols}");
-            //FitPredict(
-            //    XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
-            //    anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
-            //    nSamplesPerFrame
-            //);
-            GridSearch(
+            FitPredict(
                 XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
                 anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
                 nSamplesPerFrame
             );
+            //GridSearch(
+            //    XTrain, XTestNormal, XTestAnomaly, yTestAnomaly,
+            //    anomalyIdToYTestAnomalyIndices, yTestAnomalyUnclearIndices,
+            //    nSamplesPerFrame
+            //);
         }
 
         private static void FitPredict(
