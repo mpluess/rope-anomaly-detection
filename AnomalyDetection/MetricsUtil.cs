@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace AnomalyDetection
 {
-    public struct Metrics
+    public class Metrics
     {
         public readonly int TP;
         public readonly int TN;
@@ -141,7 +141,7 @@ namespace AnomalyDetection
                     }
                     else if (labels.truth == 1 && labels.predicted == 0)
                     {
-                        // Don't count FPs on unclear regions within a frame containing anomalies.
+                        // Don't count FPs on unclear regions within a frame containing anomalies (normal frames cannot contain unclear regions).
                         if (!yAnomalyUnclearIndices.Contains(i))
                         {
                             ++fp;
@@ -217,7 +217,6 @@ namespace AnomalyDetection
 
         private static void PrintPerSampleMetrics(Metrics metrics)
         {
-            
             Console.WriteLine("Per-sample metrics:");
             Console.WriteLine($"TP={metrics.TP}, TN={metrics.TN}, FP={metrics.FP}, FN={metrics.FN}");
             Console.WriteLine($"Frame percentage containing false positives: {metrics.FpFramesPercentage} ({metrics.NFramesWithFps} / {metrics.NFrames})");

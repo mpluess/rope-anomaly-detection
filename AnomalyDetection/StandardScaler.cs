@@ -8,11 +8,18 @@ using System.Threading.Tasks;
 
 namespace AnomalyDetection
 {
+    /// <summary>
+    /// Standardize data to mean 0, standard deviation 1.
+    /// </summary>
     public class StandardScaler
     {
         private float[] means = null;
         private float[] stdDevs = null;
 
+        /// <summary>
+        /// Calculate means and standard deviations per column on a train set.
+        /// </summary>
+        /// <param name="X"></param>
         public void Fit(Mat X)
         {
             means = new float[X.Cols];
@@ -31,6 +38,11 @@ namespace AnomalyDetection
             }
         }
 
+        /// <summary>
+        /// Standardize data to roughly mean 0, standard deviation 1 based on the means and stdDevs calculated on the train set.
+        /// </summary>
+        /// <param name="X"></param>
+        /// <returns></returns>
         public Mat Transform(Mat X)
         {
             if (means == null || stdDevs == null)

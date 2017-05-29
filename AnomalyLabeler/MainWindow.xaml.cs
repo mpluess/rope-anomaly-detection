@@ -44,7 +44,7 @@ namespace AnomalyLabeler
         private int xStart;
 
         private ISet<ulong> annotatedFrames;
-        private List<AnnotationV2> annotations;
+        private List<Annotation> annotations;
 
         public MainWindow()
         {
@@ -74,14 +74,14 @@ namespace AnomalyLabeler
 
             hasLabelingStarted = false;
             annotatedFrames = new HashSet<ulong>();
-            annotations = new List<AnnotationV2>();
+            annotations = new List<Annotation>();
         }
 
         #region callbacks
         private void NextButton_Click(object sender, RoutedEventArgs e)
         {
             annotatedFrames.Add(GetCurrentFrame());
-            AnnotationsV2Writer.Write(PathToAnnotation, annotatedFrames, annotations);
+            AnnotationsWriter.Write(PathToAnnotation, annotatedFrames, annotations);
 
             raw.ReadNextFrame();
             CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
@@ -90,7 +90,7 @@ namespace AnomalyLabeler
         private void PreviousButton_Click(object sender, RoutedEventArgs e)
         {
             annotatedFrames.Add(GetCurrentFrame());
-            AnnotationsV2Writer.Write(PathToAnnotation, annotatedFrames, annotations);
+            AnnotationsWriter.Write(PathToAnnotation, annotatedFrames, annotations);
 
             raw.ReadPreviousFrame();
             CurrentFrameTextBlock.Text = "Current frame: " + GetCurrentFrame().ToString();
@@ -118,11 +118,11 @@ namespace AnomalyLabeler
                 var result = messageBox.Show();
                 if (result == Gat.Controls.MessageBoxResult.Yes)
                 {
-                    annotations.Add(new AnnotationV2(GetCurrentFrame(), LabelV2.Anomaly, xStart, xEnd));
+                    annotations.Add(new Annotation(GetCurrentFrame(), AnnotationLabel.Anomaly, xStart, xEnd));
                 }
                 else if (result == Gat.Controls.MessageBoxResult.No)
                 {
-                    annotations.Add(new AnnotationV2(GetCurrentFrame(), LabelV2.Unclear, xStart, xEnd));
+                    annotations.Add(new Annotation(GetCurrentFrame(), AnnotationLabel.Unclear, xStart, xEnd));
                 }
 
                 RopeImageOverlayCanvas.Children.Clear();

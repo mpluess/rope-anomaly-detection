@@ -27,6 +27,10 @@ namespace AnomalyDetection
         /// </summary>
         public readonly int EndCellY;
 
+        /// <summary>
+        /// Width of the rope in cells.
+        /// Corresponds to image height since the rope runs horizontally.
+        /// </summary>
         public readonly int RopeWidthCells;
 
         /// <summary>
@@ -44,8 +48,17 @@ namespace AnomalyDetection
         }
     }
 
-    // TODO save / load
     /// <summary>
+    /// Class to transform frames to a feature matrix X with dimensions (n_samples, n_features).
+    /// The samples are parts of a frame CellWidth pixels wide consisting of RopeWidthCells cells.
+    /// The features are NBins HOG features, the entropy of the HOG features
+    /// and the percentage of pixels <= MaxBackgroundIntensity --> 6 per cell --> n_features = 6 * RopeWidthCells.
+    /// 
+    /// The API is based on sklearn transformers (http://scikit-learn.org).
+    /// "..., these are represented by classes with a fit method, which learns model parameters (e.g. mean and standard deviation for normalization)
+    /// from a training set, and a transform method which applies this transformation model to unseen data.
+    /// fit_transform may be more convenient and efficient for modelling and transforming the training data simultaneously."
+    /// 
     /// Important: expects a video where the rope runs horizontally!
     /// </summary>
     public class HogTransformer
@@ -76,7 +89,7 @@ namespace AnomalyDetection
         }
 
         /// <summary>
-        /// Segments the image and determines the minimum width of rope.
+        /// Segment the image, determine and set the number of cells constituting a sample by estimating the rope width.
         /// </summary>
         /// <param name="raw"></param>
         /// <param name="normalFrames"></param>
@@ -110,11 +123,13 @@ namespace AnomalyDetection
         }
 
         /// <summary>
-        /// Segments the image, determines the minimum width of rope and transforms frames to a HOG feature matrix.
+        /// Segment the image, determine and set the number of cells constituting a sample and transform frames to a HOG feature matrix.
+        /// 
+        /// Use this method for the train set.
         /// </summary>
         /// <param name="raw"></param>
         /// <param name="normalFrames"></param>
-        /// <returns>HOG feature matrix with dimensions (|normalFrames| * FrameWidth / CellWidth) x (NBins * RopeWidthCells)</returns>
+        /// <returns>HOG feature matrix with dimensions (|normalFrames| * FrameWidth / CellWidth) x ((NBins + 2) * RopeWidthCells)</returns>
         public Mat FitTransform(RawImage raw, ulong[] normalFrames)
         {
             Console.WriteLine($"[{DateTime.Now}] HogTransformer.FitTransform: calling Fit");
@@ -126,14 +141,16 @@ namespace AnomalyDetection
         }
 
         /// <summary>
-        /// Transforms frames to a HOG feature matrix.
+        /// Segment the image and transform frames to a HOG feature matrix.
         /// One row of the matrix = one sample describes a part of the rope which is CellWidth pixels high
         /// and RopeWidthCells * CellHeight pixels wide (= the whole rope diameter).
+        /// 
+        /// Use this method for the test set.
         /// </summary>
         /// <param name="raw"></param>
         /// <param name="frames"></param>
         /// <param name="ropeLocations"></param>
-        /// <returns>HOG feature matrix with dimensions (|frames| * FrameWidth / CellWidth) x (NBins * RopeWidthCells)</returns>
+        /// <returns>HOG feature matrix with dimensions (|frames| * FrameWidth / CellWidth) x ((NBins + 2) * RopeWidthCells)</returns>
         public Mat Transform(RawImage raw, ulong[] frames, RopeLocation[][] ropeLocations = null)
         {
             if (ropeLocations == null)
@@ -156,8 +173,8 @@ namespace AnomalyDetection
                     AddFeatureVectorsOfFrame(samples, ropeFrame, frameWithRopeLocations.ropeLocations);
                 }
             }
-            // transform the features for SVM
-            // TODO refactor AddFeatureVector to make this unnecessary
+
+            // Transform the features for SVM
             Console.WriteLine($"[{DateTime.Now}] HogTransformer.Transform: calling ConvertToMl");
             return MatUtil.ConvertToMl(samples);
         }
@@ -244,11 +261,11 @@ namespace AnomalyDetection
                         {
                             startY = cellY;
                         }
-                        else if (startY != -1 && currentCellType == CellType.Background && lastCellType.Value == CellType.Edge && cellY - 2 >= startY)
+                        else if (startY != -1 && lastCellType.Value == CellType.Edge && currentCellType == CellType.Background && cellY - 2 >= startY)
                         {
                             endY = cellY - 2;
                         }
-                        else if (startY != -1 && currentCellType == CellType.Background && lastCellType.Value == CellType.Rope)
+                        else if (startY != -1 && lastCellType.Value == CellType.Rope && currentCellType == CellType.Background)
                         {
                             endY = cellY - 1;
                         }
@@ -268,7 +285,7 @@ namespace AnomalyDetection
                     // Include lower edge
                     ++endY;
 
-                    // Get all percentages of this sample (vertical).
+                    // Get all percentages of this sample
                     var sampleBackgroundPixelPercentages = backgroundPixelPercentages.Select(array => array[cellX]).ToArray();
                     ropeLocations[cellX] = new RopeLocation(startY, endY, sampleBackgroundPixelPercentages);
                 }
@@ -281,6 +298,12 @@ namespace AnomalyDetection
             return ropeLocations;
         }
 
+        /// <summary>
+        /// Create feature vectors for all samples in one frame (imageMatrix) and add them to samples.
+        /// </summary>
+        /// <param name="samples"></param>
+        /// <param name="imageMatrix"></param>
+        /// <param name="ropeLocations"></param>
         private void AddFeatureVectorsOfFrame(VectorOfMat samples, Mat imageMatrix, RopeLocation[] ropeLocations)
         {
             Size size = imageMatrix.Size;
@@ -308,15 +331,11 @@ namespace AnomalyDetection
                     )
                 )
                 {
-                    // debug
-                    //Mat drawing = new Mat(); CvInvoke.CvtColor(image2, drawing, ColorConversion.Gray2Bgr);
-                    //CvInvoke.NamedWindow("GetFeatureVector Debug", NamedWindowType.Normal); CvInvoke.Imshow("GetFeatureVector Debug", drawing); CvInvoke.WaitKey();
-
                     var hog = new HOGDescriptor(windowSize, blockSize, blockStride, cellSize, nbins: NBins);
                     float[] hogResult = hog.Compute(ropeOnlyImage, winStride: windowStride);
                     Debug.Assert(hogResult.Length == NBins * RopeWidthCells);
 
-                    // Add entropy feature per cell.
+                    // Add entropy and background pixel percentage features per cell.
                     int nFeaturesPerCell = NBins + 2;
                     var sample = new float[nFeaturesPerCell * RopeWidthCells];
                     for (int cellNr = 0; cellNr < RopeWidthCells; ++cellNr)
@@ -329,7 +348,8 @@ namespace AnomalyDetection
                         }
 
                         // Return value per cell: vector gradient magnitudes, normalized with L2-hys per block, gamma-corrected.
-                        // For the entropy calculation we need probabilities per bin so we have to normalize the cell vector first (norm = 1).
+                        // --> vector sum != 1
+                        // For the entropy calculation we need probabilities per bin so we have to normalize the cell vector first to have sum = 1.
                         var probs = ToProbs(cell);
                         float entropy = CalculateEntropy(probs);
                         sample[cellNr * nFeaturesPerCell + NBins] = entropy;
@@ -344,6 +364,11 @@ namespace AnomalyDetection
             }
         }
 
+        /// <summary>
+        /// Normalize vector so its sum is equal to 1.
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <returns></returns>
         private float[] ToProbs(float[] vector)
         {
             foreach (float f in vector)

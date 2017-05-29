@@ -35,7 +35,8 @@ namespace AnomalyDetection
 
         public static void Main(string[] args)
         {
-            var annotations = AnnotationsV2Reader.Read(PathToAnnotation);
+            // Load anomaly annotations for video
+            var annotations = AnnotationsReader.Read(PathToAnnotation);
 
             // Shuffle normal frames before train-test-split to make test set more diverse. Use seed for reproducibility.
             // Otherwise, shuffling seems to have no effect on SVM training so this is the only place we have to do it:
@@ -74,6 +75,7 @@ namespace AnomalyDetection
             }
             else
             {
+                // Fit feature extractor and extract features from video for the normal, anomaly-free frames of the training set.
                 var raw = new RawImage(new FileInfo(PathToVideo));
                 var featureTransformer = new HogTransformer();
                 XTrain = featureTransformer.FitTransform(raw, normalFramesTrain);
@@ -81,6 +83,7 @@ namespace AnomalyDetection
                 nSamplesPerFrame = XTrain.Rows / normalFramesTrain.Length;
                 cellWidth = featureTransformer.CellWidth;
 
+                // Extract features from video for test frames.
                 XTestNormal = featureTransformer.Transform(raw, normalFramesTest);
                 XTestAnomaly = featureTransformer.Transform(raw, annotations.AnomalyFrames);
 
@@ -104,13 +107,20 @@ namespace AnomalyDetection
                 }
             }
 
+            // Create label vector for anomaly frames test set.
+            // Start off by labeling every sample as normal.
             var yTestAnomaly = new int[XTestAnomaly.Rows];
             for (int i = 0; i < yTestAnomaly.Length; ++i)
             {
                 yTestAnomaly[i] = 1;
             }
 
+            // Create a map of anomaly ids, which mark different anomaly regions as part of the same actual anomaly
+            // which can usually be seen on multiple frames, to all corresponding indices in the yTestAnomaly label vector
+            // to be able to calculate per-anomaly metrics.
             var anomalyIdToYTestAnomalyIndices = new Dictionary<string, ISet<int>>();
+            
+            // Relabel samples which are part of an annotated anomaly region to anomaly samples.
             foreach (var anomalyRegion in annotations.AnomalyRegions)
             {
                 int offset = Array.IndexOf(annotations.AnomalyFrames, anomalyRegion.Frame) * nSamplesPerFrame;
@@ -126,6 +136,7 @@ namespace AnomalyDetection
                 }
             }
 
+            // Mark unclear regions in yTestAnomaly so FPs in these regions can be filtered out.
             var yTestAnomalyUnclearIndices = new HashSet<int>();
             foreach (var unclearRegion in annotations.UnclearRegions)
             {
@@ -154,6 +165,16 @@ namespace AnomalyDetection
             //);
         }
 
+        /// <summary>
+        /// Fit one-class SVM to XTrain feature matrix, predict train and test sets and print metrics.
+        /// </summary>
+        /// <param name="XTrain"></param>
+        /// <param name="XTestNormal"></param>
+        /// <param name="XTestAnomaly"></param>
+        /// <param name="yTestAnomaly"></param>
+        /// <param name="anomalyIdToYTestAnomalyIndices"></param>
+        /// <param name="yTestAnomalyUnclearIndices"></param>
+        /// <param name="nSamplesPerFrame"></param>
         private static void FitPredict(
             Mat XTrain, Mat XTestNormal, Mat XTestAnomaly, int[] yTestAnomaly,
             Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices, HashSet<int> yTestAnomalyUnclearIndices,
@@ -162,6 +183,7 @@ namespace AnomalyDetection
         {
             var classifier = new SvmOneClassClassifier();
 
+            // Best hyperparameters as found by the GridSearch method.
             classifier.Fit(XTrain, 0.01, 0.01);
 
             Console.WriteLine();
@@ -179,18 +201,36 @@ namespace AnomalyDetection
             );
         }
 
+        /// <summary>
+        /// Fit an SVM for all combinations of a hyperparameter grid and calculate metrics
+        /// to optimize hyperparameters.
+        /// Prints results in order, best parameter combinations first.
+        /// Also writes a CSV file containing the results of all combinations.
+        /// See body for details on what's considered "best".
+        /// </summary>
+        /// <param name="XTrain"></param>
+        /// <param name="XTestNormal"></param>
+        /// <param name="XTestAnomaly"></param>
+        /// <param name="yTestAnomaly"></param>
+        /// <param name="anomalyIdToYTestAnomalyIndices"></param>
+        /// <param name="yTestAnomalyUnclearIndices"></param>
+        /// <param name="nSamplesPerFrame"></param>
+        /// <param name="resultGridCsvFile"></param>
+        /// <param name="csvSeparator"></param>
         private static void GridSearch(
             Mat XTrain, Mat XTestNormal, Mat XTestAnomaly, int[] yTestAnomaly,
             Dictionary<string, ISet<int>> anomalyIdToYTestAnomalyIndices, HashSet<int> yTestAnomalyUnclearIndices,
             int nSamplesPerFrame, string resultGridCsvFile = "grid_search_results.csv", string csvSeparator = ";"
         )
         {
+            // Logarithmic grids with base 10 for gamma and nu hyperparameters.
             var gammaValues = new double[] {
                 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0,
             };
             var nuValues = new double[] {
                 0.00001, 0.0001, 0.001, 0.01, 0.1,
             };
+
             var results = new List<Tuple<double, double, Metrics>>();
             var resultGridCsv = new StringBuilder();
             resultGridCsv.AppendLine(csvSeparator + string.Join(csvSeparator, gammaValues.Select(d => d.ToString())));
@@ -215,6 +255,8 @@ namespace AnomalyDetection
                 resultGridCsv.AppendLine();
             }
 
+            // Filter results: a maximum of 50% of test frames containing FPs are tolerated.
+            // Sort results: The goal is to maximize recall and find all anomalies. If the recall on anomaly level is equal, sort by recall on sample level.
             foreach (var result in results.Where(r => r.Item3.FpFramesPercentage < 50.0).OrderByDescending(r => r.Item3.TpAnomalyLevel).ThenByDescending(r => r.Item3.Recall))
             {
                 Console.WriteLine($"gamma={result.Item1}, nu={result.Item2}");

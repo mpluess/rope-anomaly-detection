@@ -11,14 +11,14 @@ namespace AnomalyModel
     /// <summary>
     /// Anomaly-based annotation
     /// </summary>
-    public class AnnotationV2
+    public class Annotation
     {
         /// <summary>
         /// zero-based
         /// </summary>
         public readonly ulong Frame;
 
-        public readonly LabelV2 Label;
+        public readonly AnnotationLabel Label;
 
         /// <summary>
         /// Horizontal location of the begin of an anomaly within the frame in pixels.
@@ -34,7 +34,7 @@ namespace AnomalyModel
 
         public readonly string AnomalyId;
 
-        public AnnotationV2(ulong frame, LabelV2 label, int xStart, int xEnd, string anomalyId = null)
+        public Annotation(ulong frame, AnnotationLabel label, int xStart, int xEnd, string anomalyId = null)
         {
             Frame = frame;
             Label = label;
@@ -49,14 +49,14 @@ namespace AnomalyModel
         }
     }
 
-    public enum LabelV2
+    public enum AnnotationLabel
     {
         Anomaly, Unclear
     }
 
-    class AnnotationV2Comparer : IComparer<AnnotationV2>
+    class AnnotationComparer : IComparer<Annotation>
     {
-        public int Compare(AnnotationV2 a, AnnotationV2 b)
+        public int Compare(Annotation a, Annotation b)
         {
             if (a.Frame < b.Frame)
             {
@@ -96,16 +96,16 @@ namespace AnomalyModel
     }
 
 
-    public class AnnotationsV2
+    public class Annotations
     {
         public readonly ulong[] NormalFrames;
         public readonly ulong[] AnomalyFrames;
         public readonly ulong[] UnclearFrames;
 
-        public readonly AnnotationV2[] AnomalyRegions;
-        public readonly AnnotationV2[] UnclearRegions;
+        public readonly Annotation[] AnomalyRegions;
+        public readonly Annotation[] UnclearRegions;
 
-        public AnnotationsV2(ulong[] normalFrames, ulong[] anomalyFrames, ulong[] unclearFrames, AnnotationV2[] anomalyRegions, AnnotationV2[] unclearRegions)
+        public Annotations(ulong[] normalFrames, ulong[] anomalyFrames, ulong[] unclearFrames, Annotation[] anomalyRegions, Annotation[] unclearRegions)
         {
             NormalFrames = normalFrames;
             AnomalyFrames = anomalyFrames;
@@ -118,7 +118,7 @@ namespace AnomalyModel
     /// <summary>
     /// Anomaly-based annotation reader (.v2.anomaly_based.ann files)
     /// </summary>
-    public class AnnotationsV2Reader
+    public class AnnotationsReader
     {
         private enum ReadState
         {
@@ -131,12 +131,12 @@ namespace AnomalyModel
         /// </summary>
         /// <param name="pathToAnnotationFile"></param>
         /// <returns></returns>
-        public static AnnotationsV2 Read(string pathToAnnotationFile)
+        public static Annotations Read(string pathToAnnotationFile)
         {
             var readState = ReadState.None;
             IEnumerable<ulong> annotatedFrames = null;
-            List<AnnotationV2> anomalyRegions = new List<AnnotationV2>();
-            List<AnnotationV2> unclearRegions = new List<AnnotationV2>();
+            List<Annotation> anomalyRegions = new List<Annotation>();
+            List<Annotation> unclearRegions = new List<Annotation>();
             foreach (var line in File.ReadLines(pathToAnnotationFile))
             {
                 if (line == "HEADER")
@@ -157,17 +157,17 @@ namespace AnomalyModel
                     Debug.Assert(split.Length == 5);
 
                     var frame = ulong.Parse(split[0]);
-                    var label = (LabelV2)(Enum.Parse(typeof(LabelV2), split[1]));
+                    var label = (AnnotationLabel)(Enum.Parse(typeof(AnnotationLabel), split[1]));
                     var xStart = int.Parse(split[2]);
                     var xEnd = int.Parse(split[3]);
                     string anomalyId = (split[4] == "" ? null : split[4]);
-                    var annotation = new AnnotationV2(frame, label, xStart, xEnd, anomalyId);
-                    if (label == LabelV2.Anomaly)
+                    var annotation = new Annotation(frame, label, xStart, xEnd, anomalyId);
+                    if (label == AnnotationLabel.Anomaly)
                     {
                         Debug.Assert(anomalyId != null);
                         anomalyRegions.Add(annotation);
                     }
-                    else if (label == LabelV2.Unclear)
+                    else if (label == AnnotationLabel.Unclear)
                     {
                         unclearRegions.Add(annotation);
                     }
@@ -191,20 +191,20 @@ namespace AnomalyModel
                 .OrderBy(l => l)
                 .ToArray();
 
-            return new AnnotationsV2(normalFrames, anomalyFrames, unclearFrames, anomalyRegions.ToArray(), unclearRegions.ToArray());
+            return new Annotations(normalFrames, anomalyFrames, unclearFrames, anomalyRegions.ToArray(), unclearRegions.ToArray());
         }
     }
 
-    public class AnnotationsV2Writer
+    public class AnnotationsWriter
     {
-        public static void Write(string pathToAnnotationFile, ISet<ulong> annotatedFrames, List<AnnotationV2> annotations)
+        public static void Write(string pathToAnnotationFile, ISet<ulong> annotatedFrames, List<Annotation> annotations)
         {
             var builder = new StringBuilder();
             builder.AppendLine("HEADER");
             builder.AppendLine($"annotated_frames={string.Join(",", annotatedFrames.OrderBy(l => l))}");
             builder.AppendLine();
             builder.AppendLine("DATA");
-            foreach (var annotation in annotations.OrderBy(a => a, new AnnotationV2Comparer()))
+            foreach (var annotation in annotations.OrderBy(a => a, new AnnotationComparer()))
             {
                 builder.AppendLine($"{annotation.Frame},{annotation.Label},{annotation.XStart},{annotation.XEnd},{(annotation.AnomalyId == null ? "" : annotation.AnomalyId)}");
             }
