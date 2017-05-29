@@ -19,7 +19,9 @@ namespace AnomalyDetection
 {
     public class Program
     {
-        private const bool DoSave = true;
+        // Save / load segmentation and feature extraction results to speed up development on classifier
+        // and hyperparameter search.
+        private const bool DoSave = false;
         private const bool DoLoad = false;
 
         private const string PathToVideo = @"D:\Users\Michel\Documents\FH\module\8_woipv\input\videos\Seil_2_2016-05-23_RAW3\2016-05-23_15-02-14.raw3";
@@ -184,7 +186,7 @@ namespace AnomalyDetection
         )
         {
             var gammaValues = new double[] {
-                0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0,
+                0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0,
             };
             var nuValues = new double[] {
                 0.00001, 0.0001, 0.001, 0.01, 0.1,

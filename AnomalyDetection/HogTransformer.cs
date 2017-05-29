@@ -19,22 +19,28 @@ namespace AnomalyDetection
     public struct RopeLocation
     {
         /// <summary>
-        /// Start included
+        /// Index of top cell, start included.
         /// </summary>
         public readonly int StartCellY;
         /// <summary>
-        /// End included
+        /// Index of bottom cell, end included.
         /// </summary>
         public readonly int EndCellY;
 
         public readonly int RopeWidthCells;
 
-        public RopeLocation(int startCellY, int endCellY)
+        /// <summary>
+        /// Percentage of background pixels per cell from top to bottom, in the range [0, 1].
+        /// </summary>
+        public readonly float[] BackgroundPixelPercentages;
+
+        public RopeLocation(int startCellY, int endCellY, float[] backgroundPixelPercentages)
         {
             Debug.Assert(endCellY >= startCellY);
             StartCellY = startCellY;
             EndCellY = endCellY;
             RopeWidthCells = EndCellY - StartCellY + 1;
+            BackgroundPixelPercentages = backgroundPixelPercentages;
         }
     }
 
@@ -90,12 +96,15 @@ namespace AnomalyDetection
 
             // Describes the width of the rope but since the rope runs horizontally in the image, this is actually the y-coordinate of the image.
             var ropeWidthsCells = ropeLocations.SelectMany(array => array).Select(location => location.RopeWidthCells);
-            RopeWidthCells = ropeWidthsCells.Min();
+            int minRopeWidthCells = ropeWidthsCells.Min();
             int maxRopeWidthCells = ropeWidthsCells.Max();
-            Console.WriteLine($"Rope width global min: {RopeWidthCells}");
-            Console.WriteLine($"frames with min width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(RopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), RopeWidthCells)})"))}");
+
+            Console.WriteLine($"Rope width global min: {minRopeWidthCells}");
+            //Console.WriteLine($"frames with min width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(minRopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), minRopeWidthCells)})"))}");
             Console.WriteLine($"Rope width global max: {maxRopeWidthCells}");
-            Console.WriteLine($"frames with max width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(maxRopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), maxRopeWidthCells)})"))}");
+            //Console.WriteLine($"frames with max width: {string.Join(", ", Enumerable.Zip(normalFrames, ropeLocations, (nr, array) => Tuple.Create(nr, array)).Where(t => t.Item2.Select(location => location.RopeWidthCells).Contains(maxRopeWidthCells)).Select(t => $"{t.Item1} ({Array.IndexOf(t.Item2.Select(l => l.RopeWidthCells).ToArray(), maxRopeWidthCells)})"))}");
+
+            RopeWidthCells = maxRopeWidthCells;
 
             return ropeLocations;
         }
@@ -144,7 +153,7 @@ namespace AnomalyDetection
                 raw.ReadFrame(frameWithRopeLocations.frameNr);
                 using (Mat ropeFrame = MatUtil.RawToMat(raw))
                 {
-                    AddFeatureVector(samples, ropeFrame, frameWithRopeLocations.ropeLocations);
+                    AddFeatureVectorsOfFrame(samples, ropeFrame, frameWithRopeLocations.ropeLocations);
                 }
             }
             // transform the features for SVM
@@ -176,11 +185,13 @@ namespace AnomalyDetection
             int imageHeightCells = image.Rows / CellHeight;
             int imageWidthCells = image.Cols / CellWidth;
             var cellTypes = new CellType[imageHeightCells][];
+            var backgroundPixelPercentages = new float[imageHeightCells][];
 
             // Integer division to ignore the last rows.
             for (int cellY = 0; cellY < imageHeightCells; ++cellY)
             {
                 cellTypes[cellY] = new CellType[imageWidthCells];
+                backgroundPixelPercentages[cellY] = new float[imageWidthCells];
 
                 // Integer division to ignore the last columns.
                 for (int cellX = 0; cellX < imageWidthCells; ++cellX)
@@ -198,6 +209,7 @@ namespace AnomalyDetection
                     }
 
                     double backgroundPixelPercentage = (double)nBackgroundPixels / (CellWidth * CellHeight);
+                    backgroundPixelPercentages[cellY][cellX] = (float)backgroundPixelPercentage;
                     if (backgroundPixelPercentage < EdgeThreshold)
                     {
                         cellTypes[cellY][cellX] = CellType.Rope;
@@ -250,10 +262,15 @@ namespace AnomalyDetection
 
                 if (startY != -1 && endY != -1)
                 {
-                    // Include edge
+                    // Include upper edge
                     --startY;
 
-                    ropeLocations[cellX] = new RopeLocation(startY, endY);
+                    // Include lower edge
+                    ++endY;
+
+                    // Get all percentages of this sample (vertical).
+                    var sampleBackgroundPixelPercentages = backgroundPixelPercentages.Select(array => array[cellX]).ToArray();
+                    ropeLocations[cellX] = new RopeLocation(startY, endY, sampleBackgroundPixelPercentages);
                 }
                 else
                 {
@@ -264,7 +281,7 @@ namespace AnomalyDetection
             return ropeLocations;
         }
 
-        private void AddFeatureVector(VectorOfMat samples, Mat imageMatrix, RopeLocation[] ropeLocations)
+        private void AddFeatureVectorsOfFrame(VectorOfMat samples, Mat imageMatrix, RopeLocation[] ropeLocations)
         {
             Size size = imageMatrix.Size;
             Size cellSize = new Size(CellWidth, CellHeight);
@@ -277,27 +294,10 @@ namespace AnomalyDetection
             for (int cellX = 0; cellX < size.Width / cellSize.Width; ++cellX)
             {
                 var location = ropeLocations[cellX];
-                int nCellsToRemove = location.RopeWidthCells - RopeWidthCells;
-
-                //int nCellsToRemoveStart = nCellsToRemove / 2;
-                //int nCellsToRemoveEnd = nCellsToRemove - nCellsToRemoveStart;
-
-                int nCellsToRemoveStart = 0;
-                int nCellsToRemoveEnd = nCellsToRemove;
-                if (nCellsToRemove < 0)
-                {
-                    Console.WriteLine(
-                        $"WARNING: rope width of {location.RopeWidthCells} is narrower than the minimum width from training {RopeWidthCells}."
-                        + $" {nCellsToRemove} additional edge / background cells will be appended."
-                    );
-                }
-
-                int y = (location.StartCellY + nCellsToRemoveStart) * cellSize.Height;
+                
+                int y = location.StartCellY * cellSize.Height;
                 int height = RopeWidthCells * cellSize.Height;
-                if (y + height >= size.Height)
-                {
-                    Console.WriteLine($"WARNING: image is too small to add additional cells.");
-                }
+                Debug.Assert(y + height < size.Height, "Image is too small to add additional cells.");
                 using (
                     Mat ropeOnlyImage = new Mat(
                         imageMatrix,
@@ -317,13 +317,14 @@ namespace AnomalyDetection
                     Debug.Assert(hogResult.Length == NBins * RopeWidthCells);
 
                     // Add entropy feature per cell.
-                    var sample = new float[(NBins + 1) * RopeWidthCells];
+                    int nFeaturesPerCell = NBins + 2;
+                    var sample = new float[nFeaturesPerCell * RopeWidthCells];
                     for (int cellNr = 0; cellNr < RopeWidthCells; ++cellNr)
                     {
                         var cell = new float[NBins];
                         for (int binNr = 0; binNr < NBins; ++binNr)
                         {
-                            sample[cellNr*(NBins + 1) + binNr] = hogResult[cellNr*NBins + binNr];
+                            sample[cellNr * nFeaturesPerCell + binNr] = hogResult[cellNr * NBins + binNr];
                             cell[binNr] = hogResult[cellNr * NBins + binNr];
                         }
 
@@ -331,7 +332,9 @@ namespace AnomalyDetection
                         // For the entropy calculation we need probabilities per bin so we have to normalize the cell vector first (norm = 1).
                         var probs = ToProbs(cell);
                         float entropy = CalculateEntropy(probs);
-                        sample[cellNr * (NBins + 1) + NBins] = entropy;
+                        sample[cellNr * nFeaturesPerCell + NBins] = entropy;
+
+                        sample[cellNr * nFeaturesPerCell + NBins + 1] = location.BackgroundPixelPercentages[location.StartCellY + cellNr];
                     }
 
                     Mat feature = new Mat(new Size(sample.Length, 1), DepthType.Cv32F, 1);
