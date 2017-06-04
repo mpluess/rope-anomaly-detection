@@ -250,7 +250,7 @@ namespace AnomalyDetection
                     );
 
                     results.Add(Tuple.Create(gamma, nu, metrics));
-                    resultGridCsv.Append(csvSeparator + $"{metrics.FnAnomalyLevel} / {metrics.Recall:F4} / {metrics.FpFramesPercentage:F2}");
+                    resultGridCsv.Append(csvSeparator + $"{metrics.RecallAnomalyLevel} / {metrics.Recall:F4} / {metrics.FpFramesPercentage:F2}");
                 }
                 resultGridCsv.AppendLine();
             }

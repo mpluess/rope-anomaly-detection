@@ -28,18 +28,26 @@ namespace AnomalyDetection
             Model.Type = SVM.SvmType.OneClass;
             Model.SetKernel(SVM.SvmKernelType.Rbf);
 
-            // Irrelevant for OpenCV's one-class implementation (NuSVM)
+            // Irrelevant for OpenCV's one-class implementation (NuSVC formulation)
             Model.C = 1;
 
             Model.Coef0 = 0;
             Model.Degree = 3;
 
+            // gamma defines how much influence a single training example has. The larger gamma is, the closer other examples must be to be affected.
+            // Source: http://scikit-learn.org/stable/modules/svm.html
+            //
             // Usual range for RBF kernel: [10^-3, 10^3]
+            // Source: http://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
             Model.Gamma = gamma;
 
-            // Small value = few samples will be classified as outliers
-            // Big value = a lot of samples will be classified as outliers
-            // Range: ]0, 1[
+            // The parameter nu in the range ]0,1[ controls the number of support vectors and training errors.
+            // It is an upper bound on the fraction of training errors and a lower bound on the fraction of support vectors.
+            // Source: http://scikit-learn.org/stable/modules/svm.html
+            //
+            // The higher nu is, the more training samples act as support vectors which means the model fits the training data
+            // more closely, resulting in a better performance on training data but possibly also in a bad performance on unseen data.
+            // This is very similar to the parameter C of an SVM with the SVC formulation.
             Model.Nu = nu;
 
             // epsilon

@@ -23,13 +23,14 @@ namespace AnomalyDetection
         public readonly double FpFramesPercentage;
         public readonly int TpAnomalyLevel;
         public readonly int FnAnomalyLevel;
+        public readonly double RecallAnomalyLevel;
         public readonly string MissedAnomalies;
 
         public Metrics(
             int tp, int tn, int fp, int fn,
             double accuracy, double specificity, double recall, double precision,
             int nFramesWithFps, int nFrames, double fpFramesPercentage,
-            int tpAnomalyLevel = -1, int fnAnomalyLevel = -1, string missedAnomalies = null
+            int tpAnomalyLevel = -1, int fnAnomalyLevel = -1, double recallAnomalyLevel = -1.0, string missedAnomalies = null
         )
         {
             TP = tp;
@@ -45,6 +46,7 @@ namespace AnomalyDetection
             FpFramesPercentage = fpFramesPercentage;
             TpAnomalyLevel = tpAnomalyLevel;
             FnAnomalyLevel = fnAnomalyLevel;
+            RecallAnomalyLevel = recallAnomalyLevel;
             MissedAnomalies = missedAnomalies;
         }
     }
@@ -196,13 +198,14 @@ namespace AnomalyDetection
             {
                 int tpAnomalyLevel = tpsPerAnomaly.Values.Where(count => count > 0).Count();
                 int fnAnomalyLevel = tpsPerAnomaly.Keys.Count - tpAnomalyLevel;
+                double recallAnomalyLevel = (double)tpAnomalyLevel / (tpAnomalyLevel + fnAnomalyLevel);
                 string missedAnomalies = string.Join(", ", tpsPerAnomaly.Where(kv => kv.Value == 0).Select(kv => kv.Key).OrderBy(k => k));
 
                 return new Metrics(
                     tp, tn, fp, fn,
                     accuracy, specificity, recall, precision,
                     nFramesWithFps, nFrames, fpFramesPercentage,
-                    tpAnomalyLevel, fnAnomalyLevel, missedAnomalies
+                    tpAnomalyLevel, fnAnomalyLevel, recallAnomalyLevel, missedAnomalies
                 );
             }
             else
